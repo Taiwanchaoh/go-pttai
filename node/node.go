@@ -33,6 +33,7 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -49,6 +50,7 @@ import (
 	"github.com/ailabstw/go-pttai/p2p"
 	"github.com/ailabstw/go-pttai/rpc"
 	pkgservice "github.com/ailabstw/go-pttai/service"
+	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/oklog/oklog/pkg/flock"
 )
 
@@ -162,6 +164,7 @@ func (n *Node) Start() error {
 	// discovery databases.
 	n.serverConfig = n.Config.P2P
 	n.serverConfig.PrivateKey = n.Config.NodeKey()
+	n.serverConfig.PrivateKeyToP2PKey()
 	n.serverConfig.Name = n.Config.NodeName()
 	n.serverConfig.Logger = n.log
 	if n.serverConfig.StaticNodes == nil {
@@ -173,7 +176,21 @@ func (n *Node) Start() error {
 	if n.serverConfig.NodeDatabase == "" {
 		n.serverConfig.NodeDatabase = n.Config.NodeDB()
 	}
-	running := &p2p.Server{Config: n.serverConfig}
+
+	p2pctx, p2pcancel := context.WithCancel(context.Background())
+
+	p2pserver, err := libp2p.New(
+		p2pctx,
+		libp2p.Identity(n.Config.P2P.P2PPrivateKey),
+		libp2p.ListenAddrStrings(n.Config.P2P.P2PListenAddr),
+	)
+	log.Debug("Start: after libp2p.New", "e", err, "p2pserver", p2pserver.ID(), "addr", n.Config.P2P.P2PListenAddr)
+	if err != nil {
+		return err
+	}
+
+	running := &p2p.Server{Config: n.serverConfig, P2PServer: p2pserver, P2Pctx: p2pctx, P2Pcancel: p2pcancel}
+
 	n.log.Info("Starting peer-to-peer node", "instance", n.serverConfig.Name)
 
 	// Otherwise copy and specialize the P2P configuration

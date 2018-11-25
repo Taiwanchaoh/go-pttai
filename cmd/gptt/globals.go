@@ -104,6 +104,7 @@ var (
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
 		utils.ListenPortFlag,
+		utils.P2PPortFlag,
 
 		utils.BootnodesFlag,
 		utils.BootnodesV4Flag,

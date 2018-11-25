@@ -196,6 +196,7 @@ func setNodeKey(ctx *cli.Context, cfg *p2p.Config) {
 		}
 		cfg.PrivateKey = key
 	}
+
 }
 
 // setBootstrapNodes creates a list of bootstrap nodes from the command line
@@ -226,6 +227,8 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 		}
 		cfg.BootstrapNodes = append(cfg.BootstrapNodes, node)
 	}
+
+	cfg.P2PBootnodes = params.IPFSBootnodes
 }
 
 // setListenAddress creates a TCP listening address string from set command
@@ -233,6 +236,10 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 func setListenAddress(ctx *cli.Context, cfg *p2p.Config) {
 	if ctx.GlobalIsSet(ListenPortFlag.Name) {
 		cfg.ListenAddr = fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name))
+	}
+
+	if ctx.GlobalIsSet(P2PPortFlag.Name) {
+		cfg.P2PListenAddr = fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ctx.GlobalInt(P2PPortFlag.Name))
 	}
 }
 

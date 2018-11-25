@@ -18,12 +18,21 @@
 package p2p
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
+
+	iaddr "github.com/ipfs/go-ipfs-addr"
+	p2pcrypto "github.com/libp2p/go-libp2p-crypto"
+	host "github.com/libp2p/go-libp2p-host"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	inet "github.com/libp2p/go-libp2p-net"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
 
 	"github.com/ailabstw/go-pttai/common"
 	"github.com/ailabstw/go-pttai/common/mclock"
@@ -141,6 +150,48 @@ type Config struct {
 
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger `toml:",omitempty"`
+
+	P2PBootnodes []string `toml:"-"`
+
+	// This field must be set to a valid secp256k1 private key.
+	P2PPrivateKey p2pcrypto.PrivKey `toml:"-"`
+
+	// This field must be set to a valid secp256k1 private key.
+	P2PPublicKey p2pcrypto.PubKey `toml:"-"`
+
+	// P2PListenAddr is the addr for libp2p (in ipfs-format)
+	P2PListenAddr string
+}
+
+func (c *Config) PrivateKeyToP2PKey() error {
+	privKey, pubKey, err := p2pcrypto.ECDSAKeyPairFromKey(c.PrivateKey)
+	log.Debug("PrivateKeyToP2PKey: after from key", "e", err)
+	if err != nil {
+		return err
+	}
+	c.P2PPrivateKey = privKey
+	c.P2PPublicKey = pubKey
+
+	return nil
+}
+
+func (c *Config) parseListenAddr() (string, string, error) {
+	listenAddr := c.ListenAddr
+
+	if listenAddr == "" {
+		return "0.0.0.0", "9487", nil
+	}
+
+	if listenAddr[0] == ':' {
+		return "0.0.0.0", string(listenAddr[1:]), nil
+	}
+
+	theSplit := strings.Split(listenAddr, ":")
+	if len(theSplit) == 1 {
+		return listenAddr, "9487", nil
+	}
+
+	return theSplit[0], theSplit[1], nil
 }
 
 // Server manages all peer connections.
@@ -172,10 +223,18 @@ type Server struct {
 	removestatic  chan *discover.Node
 	posthandshake chan *conn
 	addpeer       chan *conn
+	addP2PPeer    chan *conn
 	delpeer       chan peerDrop
 	loopWG        sync.WaitGroup // loop, listenLoop
 	peerFeed      event.Feed
 	log           log.Logger
+
+	// P2PServer
+	P2PServer host.Host `toml:"-"`
+
+	P2Pctx    context.Context
+	P2Pcancel context.CancelFunc
+	P2PKadDHT *dht.IpfsDHT
 }
 
 type peerOpFunc func(map[discover.NodeID]*Peer)
@@ -363,6 +422,8 @@ func (srv *Server) Stop() {
 	}
 	close(srv.quit)
 
+	srv.P2Pcancel()
+
 	log.Debug("Stop: to loopWG.Wait")
 	srv.loopWG.Wait()
 	log.Debug("Stop: after loopWG.Wait")
@@ -517,10 +578,45 @@ func (srv *Server) Start() (err error) {
 		srv.log.Warn("P2P server will be useless, neither dialing nor listening")
 	}
 
+	// libp2p
+	srv.InitP2P()
+
 	srv.loopWG.Add(1)
 	go srv.run(dialer)
 	srv.running = true
 	return nil
+}
+
+func (srv *Server) InitP2P() error {
+	srv.P2PServer.SetStreamHandler("/gptt/0.1.0", srv.handleP2PStream)
+
+	kadDht, err := dht.New(srv.P2Pctx, srv.P2PServer)
+	if err != nil {
+		return err
+	}
+	srv.P2PKadDHT = kadDht
+
+	srv.bootstrapP2PNodes()
+
+	return nil
+}
+
+func (srv *Server) bootstrapP2PNodes() {
+	for _, peerAddr := range srv.Config.P2PBootnodes {
+		addr, _ := iaddr.ParseString(peerAddr)
+		peerinfo, _ := pstore.InfoFromP2pAddr(addr.Multiaddr())
+
+		if err := srv.P2PServer.Connect(srv.P2Pctx, *peerinfo); err != nil {
+			log.Error("bootstrapP2PNodes: unable to connect", "e", err, "peerinfo", peerinfo)
+		} else {
+			log.Info("bootstrapP2PNodes: connected", "peerinfo", peerinfo)
+		}
+	}
+}
+
+func (srv *Server) handleP2PStream(stream inet.Stream) {
+	log.Debug("Received a new stream")
+
 }
 
 func (srv *Server) startListening() error {

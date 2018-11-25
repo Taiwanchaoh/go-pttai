@@ -272,6 +272,11 @@ var (
 		Usage: "Network listening port",
 		Value: 9487,
 	}
+	P2PPortFlag = cli.IntFlag{
+		Name:  "p2pport",
+		Usage: "libp2p listening port",
+		Value: 9488,
+	}
 	BootnodesFlag = cli.StringFlag{
 		Name:  "bootnodes",
 		Usage: "Comma separated enode URLs for P2P discovery bootstrap (set v4+v5 instead for light servers)",
