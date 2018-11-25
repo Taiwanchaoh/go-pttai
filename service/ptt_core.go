@@ -17,8 +17,11 @@
 package service
 
 import (
+	"net/url"
+
 	"github.com/ailabstw/go-pttai/common"
 	"github.com/ailabstw/go-pttai/common/types"
+	"github.com/ailabstw/go-pttai/p2p/discover"
 	"github.com/ailabstw/go-pttai/pttdb"
 )
 
@@ -84,6 +87,27 @@ func (p *BasePtt) BEGetPeers() ([]*BackendPeer, error) {
 	}
 
 	return peerList, nil
+}
+
+func (p *BasePtt) AddPeer(urlBytes []byte) (bool, error) {
+	theURL, err := url.Parse(string(urlBytes))
+
+	if theURL.Scheme != "pnode" {
+		return false, types.ErrInvalidURL
+	}
+
+	nodeIDStr := theURL.Host
+	nodeIDBytes := []byte(nodeIDStr)
+
+	nodeID := &discover.NodeID{}
+	err = nodeID.UnmarshalText(nodeIDBytes)
+	if err != nil {
+		return false, types.ErrInvalidURL
+	}
+
+	p.AddDial(nodeID, nil, PeerTypeRandom)
+
+	return true, nil
 }
 
 /**********

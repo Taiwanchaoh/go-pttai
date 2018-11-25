@@ -695,6 +695,10 @@ func (p *BasePtt) AddDial(nodeID *discover.NodeID, opKey *common.Address, peerTy
 			return nil
 		}
 
+		if opKey == nil {
+			return nil
+		}
+
 		// just do the specific entity
 		entity, err := p.getEntityFromHash(opKey, &p.lockOps, p.ops)
 		if err != nil {
@@ -704,9 +708,11 @@ func (p *BasePtt) AddDial(nodeID *discover.NodeID, opKey *common.Address, peerTy
 		return nil
 	}
 
-	err := p.dialHist.Add(nodeID, opKey)
-	if err != nil {
-		return err
+	if opKey != nil {
+		err := p.dialHist.Add(nodeID, opKey)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Debug("ptt.AddDial: to CheckDialEntityAndIdentifyPeer", "nodeID", nodeID, "peer", peer)

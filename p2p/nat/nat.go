@@ -205,6 +205,7 @@ func (n *autodisc) AddMapping(protocol string, extport, intport int, name string
 	if err := n.wait(); err != nil {
 		return err
 	}
+	log.Debug("NAT.AddMapping: to add mapping", "protocol", protocol, "extport", extport, "intport", intport, "name", name, "lifetime", lifetime)
 	return n.found.AddMapping(protocol, extport, intport, name, lifetime)
 }
 

@@ -58,6 +58,10 @@ func (api *PrivateAPI) GetPeers() ([]*BackendPeer, error) {
 	return api.p.BEGetPeers()
 }
 
+func (api *PrivateAPI) AddPeer(url string) (bool, error) {
+	return api.p.AddPeer([]byte(url))
+}
+
 /**********
  * Entities
  **********/
