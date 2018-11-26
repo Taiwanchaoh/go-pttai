@@ -34,7 +34,7 @@ function run_gptt_node () {
        filepath = path.join(process.resourcesPath, "app");
     }
 
-    gptt_node = exec(path.join(filepath, gpttFile) , ['--httpdir', path.join(filepath, 'static')], function(err, data) {
+    gptt_node = exec(path.join(filepath, gpttFile) , ['--httpdir', path.join(filepath, 'static'), '--server'], function(err, data) {
         console.log('err:', err)
         console.log('data:',data)
     });
