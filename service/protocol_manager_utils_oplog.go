@@ -74,6 +74,33 @@ func (pm *BaseProtocolManager) SignOplog(oplog *BaseOplog) error {
 	return nil
 }
 
+func (pm *BaseProtocolManager) ForceSignOplog(oplog *BaseOplog) error {
+	myEntity := pm.Ptt().GetMyEntity()
+
+	err := myEntity.Sign(oplog)
+	if err != nil {
+		return err
+	}
+
+	if oplog.MasterLogID != nil {
+		return nil
+	}
+
+	err = myEntity.MasterSign(oplog)
+	if err != nil {
+		return err
+	}
+
+	masterLogID := pm.GetNewestMasterLogID()
+
+	err = oplog.SetMasterLogID(masterLogID, 1)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (pm *BaseProtocolManager) GetOplogMerkleNodeList(merkle *Merkle, level MerkleTreeLevel, startKey []byte, limit int, listOrder pttdb.ListOrder) ([]*MerkleNode, error) {
 
 	var err error

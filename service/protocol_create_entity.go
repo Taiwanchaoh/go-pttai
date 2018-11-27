@@ -82,7 +82,7 @@ func (spm *BaseServiceProtocolManager) CreateEntity(
 	}
 
 	// 5. sign oplog
-	err = pm.SignOplog(oplog)
+	err = pm.ForceSignOplog(oplog)
 	if err != nil {
 		return nil, err
 	}

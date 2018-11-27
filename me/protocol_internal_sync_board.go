@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/ailabstw/go-pttai/common/types"
+	"github.com/ailabstw/go-pttai/content"
 	pkgservice "github.com/ailabstw/go-pttai/service"
 )
 
@@ -82,5 +83,60 @@ func (pm *ProtocolManager) HandleInternalSyncBoardAck(
 
 ) error {
 
+	// unmarshal data
+	theBoardData := content.NewEmptyApproveJoinBoard()
+
+	data := &InternalSyncBoardAck{BoardData: theBoardData}
+	err := json.Unmarshal(dataBytes, data)
+	if err != nil {
+		return err
+	}
+
+	// oplog
+	oplog := &pkgservice.BaseOplog{ID: data.LogID}
+	err = oplog.Lock()
+	if err != nil {
+		return err
+	}
+	defer oplog.Unlock()
+
+	pm.SetMeDB(oplog)
+	err = oplog.Get(data.LogID, true)
+	if oplog.IsSync {
+		return nil
+	}
+
+	// contentSPM
+	contentSPM := pm.Entity().Service().(*Backend).contentBackend.SPM().(*content.ServiceProtocolManager)
+
+	err = contentSPM.Lock(oplog.ObjID)
+	if err != nil {
+		return err
+	}
+	defer contentSPM.Unlock(oplog.ObjID)
+
+	board := contentSPM.Entity(oplog.ObjID)
+	if board == nil {
+		return pm.handleInternalSyncBoardAckNew(contentSPM, theBoardData, oplog, peer)
+	}
+
 	return types.ErrNotImplemented
+}
+
+func (pm *ProtocolManager) handleInternalSyncBoardAckNew(
+	spm *content.ServiceProtocolManager,
+	data *pkgservice.ApproveJoinEntity,
+	oplog *pkgservice.BaseOplog,
+	peer *pkgservice.PttPeer,
+) error {
+
+	_, err := spm.CreateJoinEntity(data, peer, oplog, true, true, true, true)
+	if err != nil {
+		return err
+	}
+
+	oplog.IsSync = true
+	oplog.Save(true)
+
+	return nil
 }
